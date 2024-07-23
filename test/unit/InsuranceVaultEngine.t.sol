@@ -7,6 +7,10 @@ import {InsuranceVault} from "../../src/InsuranceVault.sol";
 import {InsuranceVaultEngine} from "../../src/InsuranceVaultEngine.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ERC20Mock} from "@openzeppelin/contracts/mocks/token/ERC20Mock.sol";
+import {IPoolAddressesProvider} from '@aave/core-v3/contracts/interfaces/IPoolAddressesProvider.sol';
+import {MockPoolInherited} from "@aave/core-v3/contracts/mocks/helpers/MockPool.sol";
+import {MockPoolAddressesProvider} from "../mocks/MockPoolAddressesProvider.sol";
+import {HelperConfig} from "../../script/HelperConfig.s.sol";
 
 contract Name is Test {
 
@@ -24,16 +28,20 @@ contract Name is Test {
     uint256 public constant ONE_MONTH = 1 * 60 * 60 * 24 * 31;
     uint256 public constant MONTHLY_PREMIUM = 0.05 ether;
     uint256 public constant MINIMUM_MEMBERSHIP_PERIOD_TO_AVAIL_CLAIM = ONE_MONTH * 6;
+    address public constant DAI_TOKEN_OWNER = 0xC959483DBa39aa9E78757139af0e9a2EDEb3f42D;
 
     function setUp() external {
-        ERC20Mock newToken = new ERC20Mock();
+        HelperConfig helperConfig = new HelperConfig();
+        (address newToken, address poolAddressesProvider) = helperConfig.activeConfig();
         token = IERC20(address(newToken));
+        ERC20Mock newTokenMock = ERC20Mock(newToken);
         vault = new InsuranceVault(address(token));
         engine = new InsuranceVaultEngine( address(vault), address(token));
         vm.deal( USER, STARTING_BALANCE);
-        newToken.mint( USER, STARTING_BALANCE);
+        vm.prank(DAI_TOKEN_OWNER);
+        newTokenMock.mint( USER, STARTING_BALANCE);
 
-        vault.setUpEngine(address(engine));
+        vault.setUpEngineAndPoolProvider(address(engine) , poolAddressesProvider);
     }
 
 
@@ -95,7 +103,9 @@ contract Name is Test {
         newUser1 = makeAddr("newuser");
         newUser2 = makeAddr("alsonewuser");
         ERC20Mock tokenToMint = ERC20Mock(address(token));
+        vm.prank(DAI_TOKEN_OWNER);
         tokenToMint.mint( newUser1, 100 ether);
+        vm.prank(DAI_TOKEN_OWNER);
         tokenToMint.mint(newUser2, 100 ether);
 
         vm.prank(USER);
@@ -139,6 +149,7 @@ contract Name is Test {
     function testIfWithdrawCase2Works() external multipleDepositsValidForClaims {
         address tempUser = makeAddr("temp");
         ERC20Mock tokenToMint = ERC20Mock(address(token));
+        vm.prank(DAI_TOKEN_OWNER);
         tokenToMint.mint(tempUser, 100 ether);
 
         vm.startPrank(tempUser);
