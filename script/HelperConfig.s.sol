@@ -34,7 +34,6 @@ contract HelperConfig is Script {
         vm.startBroadcast();
         ERC20Mock asset= new ERC20Mock();
         MockPoolAddressesProvider mock = new MockPoolAddressesProvider();
-        MockPoolInherited pool = new MockPoolInherited(mock);
         vm.stopBroadcast();
 
         return NetworkConfig({

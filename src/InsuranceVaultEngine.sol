@@ -21,9 +21,9 @@ contract InsuranceVaultEngine {
     error InsuranceVaultEngine__PaidLessThanMinimumLiquidationFeeToLiquidate();
     error InsuranceVaultEngine__UserCannotBeLiquidatedYet();
 
-    uint256 public constant MONTHLY_PREMIUM = 0.05 ether;
-    uint256 public constant MONTHLY_FEE = 0.01 ether;
-    uint256 public constant LIQUIDATION_FEE = 0.04 ether;
+    uint256 public constant MONTHLY_PREMIUM = 150 ether; //Assuming we are working with DAI
+    uint256 public constant MONTHLY_FEE = 30 ether;
+    uint256 public constant LIQUIDATION_FEE = 120 ether;
     uint256 public constant ONE_MONTH = 1 * 60 * 60 * 24 * 31;
     uint256 public constant MINIMUM_MEMBERSHIP_PERIOD_TO_AVAIL_CLAIM = ONE_MONTH * 6; //Approximately 6 months
     uint256 public constant MAX_PERCENTAGE_OF_TREASURY_ALLOTED = 49;

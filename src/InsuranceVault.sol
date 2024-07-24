@@ -32,7 +32,8 @@ contract InsuranceVault is ERC4626Strategy, Ownable {
     function setUpEngineAndPoolProvider(address _engine, address _poolAddressesProvider) external onlyOwner {
         s_insuranceVaultEngine = InsuranceVaultEngine(_engine);
         s_liquidityInteractions = new LiquidityInteractions(_poolAddressesProvider);
-        s_asset.approve(address(s_insuranceVaultEngine), type(uint256).max);
+        s_asset.approve(address(s_insuranceVaultEngine) , type(uint256).max);
+        // s_asset.approve(address(s_liquidityInteractions) , type(uint256).max);
         transferOwnership(address(s_insuranceVaultEngine));
     }
 
@@ -57,14 +58,24 @@ contract InsuranceVault is ERC4626Strategy, Ownable {
     /**
      * @notice Putting assets into the lending pool just after they are put into the vault
      * @param assets The amount of assets to lend
+     * 
+     * 1] Approve the amount of assets to the liquidity pool contract
+     * 2] Transfer the amount of assets to the liquidity pool contract
+     * 3] Use the supplyLiquidity() function 
      */
     function afterDeposit(uint256 assets, uint256 /*shares*/ ) internal override {
-        // s_liquidityInteractions.supplyLiquidity(address(s_asset), assets);
+        s_asset.approve(address(s_liquidityInteractions) , assets);
+        s_asset.transfer(address(s_liquidityInteractions) , assets);
+        s_liquidityInteractions.supplyLiquidity(address(s_asset), assets);
     }
 
     /**
      * @notice  Withdraws assets(along with interest gained) from the lending pool
      * @param   assets  The amount of assets to withdraw
+     * 
+     *  1] Get the total appreciated collateral value of the funds we put in
+     *  2] Withdraw from the pool
+     *  3] Give required amount to the user
      */
     function beforeWithdraw(uint256 assets, uint256 /*shares*/) internal override {
         

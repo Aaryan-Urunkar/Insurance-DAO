@@ -24,9 +24,9 @@ contract Name is Test {
     address newUser1;
     address newUser2;
 
-    uint256 constant STARTING_BALANCE = 100e18;
+    uint256 constant STARTING_BALANCE = 300000e18; //Assuming we are working with DAI
     uint256 public constant ONE_MONTH = 1 * 60 * 60 * 24 * 31;
-    uint256 public constant MONTHLY_PREMIUM = 0.05 ether;
+    uint256 public constant MONTHLY_PREMIUM = 150 ether;
     uint256 public constant MINIMUM_MEMBERSHIP_PERIOD_TO_AVAIL_CLAIM = ONE_MONTH * 6;
     address public constant DAI_TOKEN_OWNER = 0xC959483DBa39aa9E78757139af0e9a2EDEb3f42D;
 
@@ -52,13 +52,13 @@ contract Name is Test {
     function testIfPayingLesserReverts() external {
         vm.expectRevert(InsuranceVaultEngine.InsuranceVaultEngine__PaidLessThanPremiumAndFees.selector);
         vm.prank(USER);
-        uint256 amt = 0.04 ether;
+        uint256 amt = 120 ether;
         engine.depositToPolicy(amt);
     }
 
     modifier depositedToPolicy() {
         vm.startPrank(USER);
-        uint256 amt = 0.07 ether;
+        uint256 amt = 210 ether;
         token.approve(address(engine), amt); 
         engine.depositToPolicy(amt);
         vm.stopPrank();
@@ -66,12 +66,12 @@ contract Name is Test {
     }
 
     function testIfVaultIsModifiedOnNewDeposit() external depositedToPolicy{
-        assertEq( engine.s_totalFees() , 0.02 ether);
+        assertEq( engine.s_totalFees() , 60 ether);
     }
 
     function testIfSuccessfulDepositEmitsEvent() external {
         vm.startPrank(USER);
-        uint256 amt = 0.07 ether;
+        uint256 amt = 210 ether;
         token.approve(address(engine), amt); 
         vm.expectEmit(true, true , true, false, address(engine));
         emit DepositSuccess( USER, amt, 1);
@@ -80,7 +80,7 @@ contract Name is Test {
     }
 
     function testIfSharesAreMintedOnSuccessfulDeposit() external depositedToPolicy{
-        uint256 monthlyPremium = 0.05 ether;
+        uint256 monthlyPremium = 150 ether;
         assertEq(monthlyPremium , vault.balanceOf(USER) );
     }
 
@@ -96,7 +96,7 @@ contract Name is Test {
 
     modifier multipleDepositsValidForClaims()  {
         vm.startPrank(USER);
-        uint256 amt = 0.07 ether;
+        uint256 amt = 210 ether;
         token.approve(address(engine), amt); 
         engine.depositToPolicy(amt);
         vm.stopPrank();
@@ -104,9 +104,9 @@ contract Name is Test {
         newUser2 = makeAddr("alsonewuser");
         ERC20Mock tokenToMint = ERC20Mock(address(token));
         vm.prank(DAI_TOKEN_OWNER);
-        tokenToMint.mint( newUser1, 100 ether);
+        tokenToMint.mint( newUser1, 300000 ether);
         vm.prank(DAI_TOKEN_OWNER);
-        tokenToMint.mint(newUser2, 100 ether);
+        tokenToMint.mint(newUser2, 300000 ether);
 
         vm.prank(USER);
         token.approve(address(engine), type(uint256).max - 1);
@@ -116,17 +116,17 @@ contract Name is Test {
             vm.warp(block.timestamp + ONE_MONTH + i);
         
             vm.startPrank(USER);
-            engine.depositToPolicy(0.07 ether);
+            engine.depositToPolicy(210 ether);
             vm.stopPrank();
             
             vm.startPrank(newUser1);
             token.approve(address(engine), type(uint256).max);
-            engine.depositToPolicy(0.06 ether);
+            engine.depositToPolicy(180 ether);
             vm.stopPrank();
             
             vm.startPrank(newUser2);
             token.approve(address(engine), type(uint256).max);
-            engine.depositToPolicy(0.06 ether);
+            engine.depositToPolicy(180 ether);
             vm.stopPrank();
         }
         _;
@@ -150,10 +150,10 @@ contract Name is Test {
         address tempUser = makeAddr("temp");
         ERC20Mock tokenToMint = ERC20Mock(address(token));
         vm.prank(DAI_TOKEN_OWNER);
-        tokenToMint.mint(tempUser, 100 ether);
+        tokenToMint.mint(tempUser, 300000 ether);
 
         vm.startPrank(tempUser);
-        uint256 amt = 0.07 ether;
+        uint256 amt = 210 ether;
         token.approve(address(engine), type(uint256).max); 
         engine.depositToPolicy(amt);
         vm.stopPrank();
@@ -187,14 +187,14 @@ contract Name is Test {
     function testLiquidateRevertsIfLiquidationIsWrong() external multipleDepositsValidForClaims{
         vm.startPrank(USER);
         vm.expectRevert(InsuranceVaultEngine.InsuranceVaultEngine__UserCannotBeLiquidatedYet.selector);
-        engine.liquidate(newUser1 , 0.04 ether);
+        engine.liquidate(newUser1 , 120 ether);
         
     }
 
     function testLiquidateRevertsIfLiquidationFeeIsLow() external multipleDepositsValidForClaims{
         vm.startPrank(USER);
         vm.expectRevert(InsuranceVaultEngine.InsuranceVaultEngine__PaidLessThanMinimumLiquidationFeeToLiquidate.selector);
-        engine.liquidate(newUser1 , 0.03 ether);
+        engine.liquidate(newUser1 , 90 ether);
     }
 
     function testLiquidate() external multipleDepositsValidForClaims{
@@ -202,7 +202,7 @@ contract Name is Test {
         vm.startPrank(USER);
         uint256 initialShareBalanceOfLiquidator = vault.balanceOf(USER);
         uint256 initialShareBalanceOfLiquidated = vault.balanceOf(newUser1);
-        uint256 newShares = engine.liquidate(newUser1 , 0.04 ether);
+        uint256 newShares = engine.liquidate(newUser1 , 120 ether);
 
         uint256 finalShareBalanceOfLiquidator = vault.balanceOf(USER);
         uint256 finalShareBalanceOfLiquidated = vault.balanceOf(newUser1);
