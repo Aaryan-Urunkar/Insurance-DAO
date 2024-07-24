@@ -28,6 +28,50 @@ If ever the withdrawal period comes, the entire premium aggregate is withdrawn f
 If the aggregate premiums of User A * 2  exceed the 49% benchmark of the treasury, he is insured 49% of the treasury. Otherwise if the claim amount is lower than 49% of the treasury, he is insured the full claim amount i.e. aggregate premiums * 2
 
 ```
+
+#### Proof of stability
+
+-    As suggested above, the treasury maintains stability through a variety of processes. No unverified claims are allowed, with every deposit there is an additional deposit fee which is uninsured and collected solely to fundraise for the protocol. Also, whenever deposits are transferred to the lending pool, an additional interest is gained in favour of the treasury for the time which the assets are deposited.
+
+#### Proof of claims
+
+-    The benefit of using an ERC4626 vault as the treasury is that the share tokens issued to the plicy holders represent not just their stake in the protocol, but also their claim. The amount of shares held by policy holders signifies that when the time comes for their claims to fruition, they are owed either their stake/aggregate premiums * 2 OR 49% of the treasury, whichever is lower.
+
+<br>
+<br>
+
 ## Getting started
+
+### Prerequisites
+
+List the tools and versions required to work on the project. For example:
+
+- [Foundry](https://getfoundry.sh/) - A blazing fast, portable, and modular toolkit for Ethereum application development written in Rust.
+- [WSL](https://learn.microsoft.com/en-us/windows/wsl/install) - A linux-like terminal in windows systems. Necessary if you want to run foundry.
+
+### Installation
+
+Step-by-step instructions to set up the project locally.
+
+1. **Install Foundry:**
+   ```sh
+   curl -L https://foundry.paradigm.xyz | bash
+   foundryup
+    ```
+
+2. **Fork the repository**
+
+<br>
+<br>
+
+3. **Install dependencies**
+    ```sh
+    forge install
+    ```
+
+4. **Compile all contracts**
+    ```sh
+    forge build
+    ```
 
 
