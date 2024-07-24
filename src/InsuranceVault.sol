@@ -8,6 +8,7 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {InsuranceVaultEngine} from "./InsuranceVaultEngine.sol";
 import {ERC4626Strategy} from "./imports/ERC4626Strategy.sol";
 import {LiquidityInteractions} from "./LiquidityInteractions.sol";
+import {Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 
 /**
  * @author  Aaryan Urunkar
@@ -16,6 +17,10 @@ import {LiquidityInteractions} from "./LiquidityInteractions.sol";
  * @notice  A vault for policy claimers to deposit their premiums and to withdraw them
  */
 contract InsuranceVault is ERC4626Strategy, Ownable {
+
+    using Math for uint256;
+
+    uint256 private s_trueAmountOfAssets;
     InsuranceVaultEngine private s_insuranceVaultEngine;
     IERC20 public s_asset;
     LiquidityInteractions private s_liquidityInteractions;
@@ -31,10 +36,11 @@ contract InsuranceVault is ERC4626Strategy, Ownable {
      */
     function setUpEngineAndPoolProvider(address _engine, address _poolAddressesProvider) external onlyOwner {
         s_insuranceVaultEngine = InsuranceVaultEngine(_engine);
-        s_liquidityInteractions = new LiquidityInteractions(_poolAddressesProvider);
-        s_asset.approve(address(s_insuranceVaultEngine) , type(uint256).max);
+        s_liquidityInteractions = new LiquidityInteractions(_poolAddressesProvider , address(s_asset));
+        s_asset.approve(address(s_insuranceVaultEngine), type(uint256).max);
         // s_asset.approve(address(s_liquidityInteractions) , type(uint256).max);
         transferOwnership(address(s_insuranceVaultEngine));
+        s_trueAmountOfAssets = 0;
     }
 
     /**
@@ -58,26 +64,85 @@ contract InsuranceVault is ERC4626Strategy, Ownable {
     /**
      * @notice Putting assets into the lending pool just after they are put into the vault
      * @param assets The amount of assets to lend
-     * 
+     *
      * 1] Approve the amount of assets to the liquidity pool contract
      * 2] Transfer the amount of assets to the liquidity pool contract
-     * 3] Use the supplyLiquidity() function 
+     * 3] Use the supplyLiquidity() function
      */
-    function afterDeposit(uint256 assets, uint256 /*shares*/ ) internal override {
-        s_asset.approve(address(s_liquidityInteractions) , assets);
-        s_asset.transfer(address(s_liquidityInteractions) , assets);
+    function _afterDeposit(uint256 assets, uint256 /*shares*/ ) internal override {
+        s_trueAmountOfAssets += assets;
+        s_asset.approve(
+            address(s_liquidityInteractions),
+            s_asset.allowance(address(this), address(s_liquidityInteractions)) + assets
+        );
+        s_asset.transfer(address(s_liquidityInteractions), assets);
+        s_liquidityInteractions.approvePool(assets);
         s_liquidityInteractions.supplyLiquidity(address(s_asset), assets);
     }
 
     /**
-     * @notice  Withdraws assets(along with interest gained) from the lending pool
+     * @notice  Withdraws just the needed amount assets from the lending pool
      * @param   assets  The amount of assets to withdraw
-     * 
-     *  1] Get the total appreciated collateral value of the funds we put in
-     *  2] Withdraw from the pool
-     *  3] Give required amount to the user
+     *
+     *  1] Withdraw from the pool
+     *  2] Bring the withdrawn funds from LiquidityInteractions to this contract 
      */
-    function beforeWithdraw(uint256 assets, uint256 /*shares*/) internal override {
-        
+    function _beforeWithdraw(uint256 assets, uint256 /*shares*/ ) internal override {
+        s_liquidityInteractions.withdrawlLiquidity( address(s_asset), assets);
+        s_asset.transferFrom(address(s_liquidityInteractions) , address(this) , assets);
+        s_trueAmountOfAssets -= assets;
+    }
+
+    /**
+     * Overridden function fron ERC4626.sol
+     * @param assets The amount of assets to be converted to shares
+     * @param rounding The type of rounding ( example: floor, ceil etc. )
+     */
+    function _convertToShares(uint256 assets, Math.Rounding rounding) internal view override returns(uint256) {
+        return assets.mulDiv(totalSupply() + 10 ** _decimalsOffset(), s_trueAmountOfAssets + 1, rounding);
+    }
+
+    /**
+     * Overridden function fron ERC4626.sol
+     * @param shares The amount of assets to be converted to shares
+     * @param rounding The type of rounding ( example: floor, ceil etc. )
+     */
+    function _convertToAssets(uint256 shares, Math.Rounding rounding) internal view override returns (uint256) {
+        return shares.mulDiv(s_trueAmountOfAssets + 1, totalSupply() + 10 ** _decimalsOffset(), rounding);
+    }
+
+    /**
+     * In case the s_totalFees of the engine are insufficient to cover off the remainder of the claim, 
+     * the engine can withdraw assets as well for an emergency basis
+     * 
+     * @param assets The amount of additional assets to be withdrawn by the engine
+     */
+    function emergencyWithdrawal(uint256 assets) external onlyOwner {
+        s_liquidityInteractions.withdrawlLiquidity( address(s_asset), assets);
+        s_asset.transferFrom(address(s_liquidityInteractions) , address(this) , assets);
+        s_trueAmountOfAssets -= assets;
+        s_asset.transfer(address(s_insuranceVaultEngine) , assets);
+    }
+
+    //////////////////
+    ////Getters//////
+    ////////////////
+
+    /**
+     * @notice  A getter function to get the address of the associated liquity pool contract
+     */
+    function getLiquidityPoolAddress() external view returns (address) {
+        return address(s_liquidityInteractions);
+    }
+
+    /**
+     * @notice A getter function to get the address of the associated InsuranceVaultEngine contract
+     */
+    function getVaultEngineAddress() external view returns (address) {
+        return address(s_insuranceVaultEngine);
+    }
+
+    function getTrueAmountOfAssets() external view returns(uint256) {
+        return s_trueAmountOfAssets;
     }
 }

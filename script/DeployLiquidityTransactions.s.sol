@@ -12,9 +12,9 @@ contract Name is Script {
 
     function run() external returns(LiquidityInteractions){
         helperConfig = new HelperConfig();
-        ( , address poolAddressesProvider) = helperConfig.activeConfig();
+        (address asset, address poolAddressesProvider) = helperConfig.activeConfig();
         vm.startBroadcast();
-        LiquidityInteractions liquidityInteractions = new LiquidityInteractions(poolAddressesProvider);
+        LiquidityInteractions liquidityInteractions = new LiquidityInteractions(poolAddressesProvider , asset);
         vm.stopBroadcast();
         return liquidityInteractions;
     }

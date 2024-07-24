@@ -2,24 +2,39 @@
 pragma solidity ^0.8.20;
 import {IPool} from "@aave/core-v3/contracts/interfaces/IPool.sol";
 import {IPoolAddressesProvider} from '@aave/core-v3/contracts/interfaces/IPoolAddressesProvider.sol';
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 /**
  * @title LiquidityInteractions
  * @author Aaryan Urunkar
  * @notice A contract to interact with the AAVE lending pool for the vault
  */
-contract LiquidityInteractions {
+contract LiquidityInteractions is Ownable{
 
     IPoolAddressesProvider immutable i_addressesProvider;
     IPool immutable i_pool;
+    IERC20 i_asset;
 
     /**
      * To initialize the pool 
      * @param _addressesProvider The deployed address of the addressesProvider fetched from the AAVE website
      */
-    constructor(address _addressesProvider ) {
+    constructor(address _addressesProvider  , address _asset) Ownable(msg.sender){
         i_addressesProvider = IPoolAddressesProvider(_addressesProvider);
         i_pool = IPool(i_addressesProvider.getPool());
+        i_asset = IERC20(_asset);
+        i_asset.approve(owner() , type(uint256).max);
+        // i_asset.approve(address(i_pool) , type(uint256).max);
+    }
+
+    /**
+     * Approves the transfer of assets to the lending pool
+     * @param _amount The amount to be approved
+     */
+    function approvePool(uint256 _amount /*, address _poolContractAddress*/) external onlyOwner{
+        i_asset.approve(address(i_pool) , _amount + i_asset.allowance(address(this) , address(i_pool)));
     }
 
 
@@ -28,7 +43,7 @@ contract LiquidityInteractions {
      * @param   _tokenAddress  The token being transferred(lent)
      * @param   _amount  The amount of the token being transferred
      */
-    function supplyLiquidity(address _tokenAddress, uint256 _amount) external {
+    function supplyLiquidity(address _tokenAddress, uint256 _amount) external onlyOwner{
         address asset = _tokenAddress;
         uint256 amount = _amount;
         address onBehalfOf = address(this);
@@ -45,6 +60,7 @@ contract LiquidityInteractions {
      */
     function withdrawlLiquidity(address _tokenAddress, uint256 _amount)
         external
+        onlyOwner
         returns (uint256)
     {
         address asset = _tokenAddress;

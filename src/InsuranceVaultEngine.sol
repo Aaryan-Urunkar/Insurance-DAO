@@ -103,7 +103,21 @@ contract InsuranceVaultEngine {
             _withdrawClaimLessThanFortyNinePercentOfTreasury(userPremiumBalance, msg.sender);
             additionalAmountToReturn = userPremiumBalance;
         }
+        s_userToMonths[msg.sender] = 0;
         return userPremiumBalance + additionalAmountToReturn;
+    }
+
+    function _withdrawClaim(uint256 _fnpot, uint256 _amount, address _to) internal {
+        s_vault.withdraw(_amount, _to, _to);
+        if (_fnpot >= (_amount * 2)) {
+            _withdrawClaimRemainder(_amount);
+        } else {
+            _withdrawClaimRemainder(_fnpot - _amount);
+        }
+    }
+
+    function _withdrawClaimRemainder(uint256 _remainder) internal {
+        if (s_totalFees < _remainder) {}
     }
 
     /**
@@ -174,7 +188,7 @@ contract InsuranceVaultEngine {
      * @dev Returns the entire amount of assets present in the protocol
      */
     function _calculateTreasury() private view returns (uint256) {
-        return s_totalFees + s_vault.totalAssets();
+        return s_totalFees + s_vault.getTrueAmountOfAssets();
     }
 
     /**
@@ -182,8 +196,7 @@ contract InsuranceVaultEngine {
      * @param _amount The amount needed to be withdrawn from the vault
      */
     function _flashWithdrawFromVault(uint256 _amount) private {
-        s_asset.approve(address(this), _amount);
-        s_asset.transferFrom(address(s_vault), address(this), _amount);
+        s_vault.emergencyWithdrawal(_amount);
         s_totalFees += _amount;
     }
 
@@ -206,6 +219,7 @@ contract InsuranceVaultEngine {
      * @param _claimToBeGiven The exact claim to be given
      * @param _userBalance The aggregate premium balance of the user in the vault
      * @param _to To whom must the claim be given to
+     * @return amountLeft The amount which is (49% of treasury - user aggregate premiums)
      */
     function _withdrawClaimMoreThanFortyNinePercentOfTreasury(
         uint256 _claimToBeGiven,
@@ -213,6 +227,7 @@ contract InsuranceVaultEngine {
         address _to
     ) private returns (uint256) {
         s_vault.withdraw(_userBalance, _to, _to);
+        console.log(_claimToBeGiven);
         uint256 amountLeft = _claimToBeGiven - _userBalance;
         if (s_totalFees < amountLeft) {
             _flashWithdrawFromVault(amountLeft - s_totalFees); //Withdrawing exactly the amount we need, absolutely nothing extra

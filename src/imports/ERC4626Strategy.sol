@@ -11,7 +11,7 @@ abstract contract ERC4626Strategy is ERC4626 {
 
         uint256 shares = previewDeposit(assets);
         _deposit(_msgSender(), receiver, assets, shares);
-        afterDeposit(assets, shares);
+        _afterDeposit(assets, shares);
 
         return shares;
     }
@@ -26,7 +26,7 @@ abstract contract ERC4626Strategy is ERC4626 {
 
         uint256 assets = previewMint(shares);
         _deposit(_msgSender(), receiver, assets, shares);
-        afterDeposit(assets, shares);
+        _afterDeposit(assets, shares);
 
         return assets;
     }
@@ -36,7 +36,7 @@ abstract contract ERC4626Strategy is ERC4626 {
         require(shares <= maxRedeem(owner), "ERC4626: redeem more than max");
 
         uint256 assets = previewRedeem(shares);
-        beforeWithdraw(assets, shares);
+        _beforeWithdraw(assets, shares);
         _withdraw(_msgSender(), receiver, owner, assets, shares);
 
         return assets;
@@ -47,7 +47,7 @@ abstract contract ERC4626Strategy is ERC4626 {
         require(assets <= maxWithdraw(owner), "ERC4626: withdraw more than max");
 
         uint256 shares = previewWithdraw(assets);
-        beforeWithdraw(assets, shares);
+        _beforeWithdraw(assets, shares);
         _withdraw(_msgSender(), receiver, owner, assets, shares);
 
         return shares;
@@ -57,7 +57,7 @@ abstract contract ERC4626Strategy is ERC4626 {
                           INTERNAL HOOKS LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    function afterDeposit(uint256 assets, uint256 shares) internal virtual {}
+    function _afterDeposit(uint256 assets, uint256 shares) internal virtual {}
     
-    function beforeWithdraw(uint256 assets, uint256 shares) internal virtual {}
+    function _beforeWithdraw(uint256 assets, uint256 shares) internal virtual {}
 }
