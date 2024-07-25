@@ -89,36 +89,17 @@ contract InsuranceVaultEngine {
         if (monthsToDuration(s_userToMonths[msg.sender]) < MINIMUM_MEMBERSHIP_PERIOD_TO_AVAIL_CLAIM) {
             revert InsuranceVaultEngine__MinimumPeriodNotLapsed();
         }
-        uint256 additionalAmountToReturn = 0;
+
         uint256 userPremiumBalance = s_vault.balanceOf(msg.sender);
         uint256 fullTreasury = _calculateTreasury();
         uint256 fortyNinePercentOfTreasury = (fullTreasury * MAX_PERCENTAGE_OF_TREASURY_ALLOTED) / PERCENTAGE_PRECISION;
-
-        if ((userPremiumBalance * 2) > fortyNinePercentOfTreasury) {
-            //In this case directly the 49% of treasury will be given
-            additionalAmountToReturn = _withdrawClaimMoreThanFortyNinePercentOfTreasury(
-                fortyNinePercentOfTreasury, userPremiumBalance, msg.sender
-            );
-        } else {
-            _withdrawClaimLessThanFortyNinePercentOfTreasury(userPremiumBalance, msg.sender);
-            additionalAmountToReturn = userPremiumBalance;
-        }
         s_userToMonths[msg.sender] = 0;
-        return userPremiumBalance + additionalAmountToReturn;
+        s_userToTimestampOfLastPayment[msg.sender] = 0;
+
+        return _withdrawClaim(fortyNinePercentOfTreasury , userPremiumBalance , msg.sender);
     }
 
-    function _withdrawClaim(uint256 _fnpot, uint256 _amount, address _to) internal {
-        s_vault.withdraw(_amount, _to, _to);
-        if (_fnpot >= (_amount * 2)) {
-            _withdrawClaimRemainder(_amount);
-        } else {
-            _withdrawClaimRemainder(_fnpot - _amount);
-        }
-    }
-
-    function _withdrawClaimRemainder(uint256 _remainder) internal {
-        if (s_totalFees < _remainder) {}
-    }
+    
 
     /**
      * @notice Once a policy holder does not pay his monthly premiums and is very incosistent for a period longer
@@ -160,7 +141,12 @@ contract InsuranceVaultEngine {
         s_userToTimestampOfLastPayment[_userToLiquidate] = 0;
     }
 
+
     fallback() external {
+        revert InsuranceVaultEngine__IllegalTransfer();
+    }
+
+    receive() external payable{
         revert InsuranceVaultEngine__IllegalTransfer();
     }
 
@@ -176,6 +162,10 @@ contract InsuranceVaultEngine {
         return months * ONE_MONTH;
     }
 
+    /**
+     * A function to feth the last payment timestamp of the policy holder
+     * @param _user Address of policy holder
+     */
     function getLastPaymentTimestampOfUser(address _user) external view returns (uint256) {
         return s_userToTimestampOfLastPayment[_user];
     }
@@ -201,39 +191,34 @@ contract InsuranceVaultEngine {
     }
 
     /**
-     * @notice Transfers intended insurance from the treasury to the user
-     * @param _amount The amount to be withdrawn by the user
-     * @param _to The address of the user( policy holder)
+     * Can transfer claims for eligible members by withdrawing from vault
+     * 
+     * @param _fortyNinePercentOfTreasury Forty nine percent of the treasury
+     * @param _amount The aggregate premiums of the user in the protocol
+     * @param _to The address of the reciever of the claim
      */
-    function _withdrawClaimLessThanFortyNinePercentOfTreasury(uint256 _amount, address _to) private {
+    function _withdrawClaim(uint256 _fortyNinePercentOfTreasury, uint256 _amount, address _to) internal returns(uint256){
         s_vault.withdraw(_amount, _to, _to);
-        if (s_totalFees < _amount) {
-            _flashWithdrawFromVault(_amount - s_totalFees); //Withdrawing exactly the amount we need, absolutely nothing extra
+        if (_fortyNinePercentOfTreasury >= (_amount * 2)) {
+            _withdrawClaimRemainder( _to , _amount);
+            return _amount * 2;
+        } else {
+            _withdrawClaimRemainder( _to , _fortyNinePercentOfTreasury - _amount);
+            return _amount + (_fortyNinePercentOfTreasury - _amount);
         }
-        s_asset.transfer(_to, _amount);
-        s_totalFees -= _amount;
     }
 
     /**
-     * @notice This function withdraws claims from the vault
-     * @param _claimToBeGiven The exact claim to be given
-     * @param _userBalance The aggregate premium balance of the user in the vault
-     * @param _to To whom must the claim be given to
-     * @return amountLeft The amount which is (49% of treasury - user aggregate premiums)
+     * @notice  A function to transfer remainder of the claim(the additional amount after the aggregate premiums)
+     * @param   _to  The address of the reciever of the assets
+     * @param   _remainder  The remainder amount of the assets after first transfer
      */
-    function _withdrawClaimMoreThanFortyNinePercentOfTreasury(
-        uint256 _claimToBeGiven,
-        uint256 _userBalance,
-        address _to
-    ) private returns (uint256) {
-        s_vault.withdraw(_userBalance, _to, _to);
-        console.log(_claimToBeGiven);
-        uint256 amountLeft = _claimToBeGiven - _userBalance;
-        if (s_totalFees < amountLeft) {
-            _flashWithdrawFromVault(amountLeft - s_totalFees); //Withdrawing exactly the amount we need, absolutely nothing extra
+    function _withdrawClaimRemainder(address _to , uint256 _remainder) internal {
+        if (s_totalFees < _remainder) {
+            _flashWithdrawFromVault(_remainder - s_totalFees);
         }
-        s_asset.transfer(_to, amountLeft);
-        s_totalFees -= amountLeft;
-        return (amountLeft);
+        s_asset.transfer(_to, _remainder);
+        s_totalFees -= _remainder;
     }
+
 }

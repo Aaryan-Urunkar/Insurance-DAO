@@ -7,6 +7,8 @@ low-premium - high-deductible mechanism( which means you are insured only for ve
 
 Whenever you are eligible for a claim, the minimum you get is 2x of all your aggregate monthly premiums assuming risk pooling is working and you aren't the only user of the protocol. However, if your claim(2x of aggregate monthly premiums) exceeds 49% of the treasury, you are insured only 49% of treasury at most. This is to ensure stability in the protocol so that enough funds are left to insure low-balance policy holders without incurring any debt.
 
+Adding to everything above, there's a penalty system as well. It's main purpose is to punish users for being inconsistent with their payments. Everytime a user pays a premium the timestamp of their latest payment is updated. However if a user fails to pay their premium for a period exceeding 3 months, they stand a chance to be liquidated by other users/ policy holders. This means that all of the shares held by the liquidated are seized and transferred to the one who liquidated him, indirectly handing over his stake in the protocol to the one who liquidated him.
+
 ### Demo explanation
 
 The algorithm for granting claims in brief:
@@ -23,6 +25,8 @@ He cannot pay >= 2 premiums within the same month(this is to protect the protoco
 
 Each time he deposits his premium, it is put up for lending and earning interest in the AAVE lending pool. 
 
+If he finds User B who is lagging with his premiums and hasn't paid in 3 months, User A can liquidate User B. Once a liquidation is performed, User B's stake is now transferred to User A and User B is kicked out of the protocol. 
+
 If ever the withdrawal period comes, the entire premium aggregate is withdrawn from the lending pool, with the rewarded additional interest which also ensures stability of the treasury and safety of the protocol
 
 If the aggregate premiums of User A * 2  exceed the 49% benchmark of the treasury, he is insured 49% of the treasury. Otherwise if the claim amount is lower than 49% of the treasury, he is insured the full claim amount i.e. aggregate premiums * 2
@@ -35,7 +39,7 @@ If the aggregate premiums of User A * 2  exceed the 49% benchmark of the treasur
 
 #### Proof of claims
 
--    The benefit of using an ERC4626 vault as the treasury is that the share tokens issued to the plicy holders represent not just their stake in the protocol, but also their claim. The amount of shares held by policy holders signifies that when the time comes for their claims to fruition, they are owed either their stake/aggregate premiums * 2 OR 49% of the treasury, whichever is lower.
+-    The benefit of using an ERC4626 vault as the treasury is that the share tokens issued to the policy holders represent not just their stake in the protocol, but also their claim. The amount of shares held by policy holders signifies that when the time comes for their claims to fruition, they are owed either their stake/aggregate premiums * 2 OR 49% of the treasury, whichever is lower.
 
 <br>
 <br>
@@ -74,4 +78,15 @@ Step-by-step instructions to set up the project locally.
     forge build
     ```
 
+
+### Usage
+
+To run the tests on a forked environment, create a ``` .env ``` file with the following:
+
+- ```SEPOLIA_RPC_URL``` : You can easily get this from <a href="https://www.alchemy.com/">Alchemy</a>
+
+    **Run the test**
+    ```bash
+    forge test --fork-url $SEPOLIA_RPC_URL 
+    ```
 

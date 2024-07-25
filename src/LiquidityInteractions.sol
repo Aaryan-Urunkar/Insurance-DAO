@@ -13,8 +13,8 @@ import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
  */
 contract LiquidityInteractions is Ownable{
 
-    IPoolAddressesProvider immutable i_addressesProvider;
-    IPool immutable i_pool;
+    IPoolAddressesProvider private i_addressesProvider;
+    IPool private i_pool;
     IERC20 i_asset;
 
     /**

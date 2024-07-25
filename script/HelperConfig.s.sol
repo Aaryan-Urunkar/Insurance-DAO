@@ -8,7 +8,8 @@ import {MockPoolInherited} from "@aave/core-v3/contracts/mocks/helpers/MockPool.
 import {MockPoolAddressesProvider} from "../test/mocks/MockPoolAddressesProvider.sol";
 
 contract HelperConfig is Script {
-    // HelperConfig public helperConfig;
+
+
     struct NetworkConfig {
         address asset;
         address poolAddressesProvider;
@@ -34,11 +35,12 @@ contract HelperConfig is Script {
         vm.startBroadcast();
         ERC20Mock asset= new ERC20Mock();
         MockPoolAddressesProvider mock = new MockPoolAddressesProvider();
+        MockPoolInherited mockPool = new MockPoolInherited(mock);
         vm.stopBroadcast();
 
         return NetworkConfig({
             asset:address(asset) , 
-            poolAddressesProvider : address(mock)
+            poolAddressesProvider : address(mockPool)
         });
     }
 

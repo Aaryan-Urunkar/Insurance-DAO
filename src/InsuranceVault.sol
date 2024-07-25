@@ -13,12 +13,16 @@ import {Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 /**
  * @author  Aaryan Urunkar
  * @title   InsuranceVault
- * @dev     The asset this vault stores is WETH
+ * @dev     The asset this vault stores is DAI
  * @notice  A vault for policy claimers to deposit their premiums and to withdraw them
  */
 contract InsuranceVault is ERC4626Strategy, Ownable {
 
     using Math for uint256;
+
+    error InsuranceVault__TransferFromLendingPoolToVaultFailed();
+    error InsuranceVault__TransferFromVaultToEngineFailed();
+    error InsuranceVault__TransferFromVaultToLendingPoolFailed();
 
     uint256 private s_trueAmountOfAssets;
     InsuranceVaultEngine private s_insuranceVaultEngine;
@@ -35,7 +39,7 @@ contract InsuranceVault is ERC4626Strategy, Ownable {
      * @param _poolAddressesProvider The address of the PoolAddressesProvider from the AAVE website
      */
     function setUpEngineAndPoolProvider(address _engine, address _poolAddressesProvider) external onlyOwner {
-        s_insuranceVaultEngine = InsuranceVaultEngine(_engine);
+        s_insuranceVaultEngine = InsuranceVaultEngine(payable(_engine));
         s_liquidityInteractions = new LiquidityInteractions(_poolAddressesProvider , address(s_asset));
         s_asset.approve(address(s_insuranceVaultEngine), type(uint256).max);
         // s_asset.approve(address(s_liquidityInteractions) , type(uint256).max);
@@ -62,6 +66,32 @@ contract InsuranceVault is ERC4626Strategy, Ownable {
     }
 
     /**
+     * In case the s_totalFees of the engine are insufficient to cover off the remainder of the claim, 
+     * the engine can withdraw assets as well for an emergency basis
+     * 
+     * @param assets The amount of additional assets to be withdrawn by the engine
+     */
+    function emergencyWithdrawal(uint256 assets) external onlyOwner {
+        s_liquidityInteractions.withdrawlLiquidity( address(s_asset), assets);
+        bool successFromPoolToVault = s_asset.transferFrom(address(s_liquidityInteractions) , address(this) , assets);
+        if(!successFromPoolToVault){
+            revert InsuranceVault__TransferFromLendingPoolToVaultFailed();
+        }
+        s_trueAmountOfAssets -= assets;
+        bool successFromVaultToEngine = s_asset.transfer(address(s_insuranceVaultEngine) , assets);
+        if(!successFromVaultToEngine){
+            revert InsuranceVault__TransferFromVaultToEngineFailed();
+        }
+    }
+
+
+    ///////////////////////////////////////////////////////////////
+    //Override functions from ERC4626.sol & ERC4626Strategy.sol////
+    ///////////////////////////////////////////////////////////////
+
+
+
+    /**
      * @notice Putting assets into the lending pool just after they are put into the vault
      * @param assets The amount of assets to lend
      *
@@ -75,7 +105,10 @@ contract InsuranceVault is ERC4626Strategy, Ownable {
             address(s_liquidityInteractions),
             s_asset.allowance(address(this), address(s_liquidityInteractions)) + assets
         );
-        s_asset.transfer(address(s_liquidityInteractions), assets);
+        bool successFromVaultToPool = s_asset.transfer(address(s_liquidityInteractions), assets);
+        if(!successFromVaultToPool) {
+            revert InsuranceVault__TransferFromVaultToLendingPoolFailed();
+        }
         s_liquidityInteractions.approvePool(assets);
         s_liquidityInteractions.supplyLiquidity(address(s_asset), assets);
     }
@@ -89,7 +122,10 @@ contract InsuranceVault is ERC4626Strategy, Ownable {
      */
     function _beforeWithdraw(uint256 assets, uint256 /*shares*/ ) internal override {
         s_liquidityInteractions.withdrawlLiquidity( address(s_asset), assets);
-        s_asset.transferFrom(address(s_liquidityInteractions) , address(this) , assets);
+        bool successFromPoolToVault = s_asset.transferFrom(address(s_liquidityInteractions) , address(this) , assets);
+        if(!successFromPoolToVault){
+            revert InsuranceVault__TransferFromLendingPoolToVaultFailed();
+        }
         s_trueAmountOfAssets -= assets;
     }
 
@@ -111,18 +147,7 @@ contract InsuranceVault is ERC4626Strategy, Ownable {
         return shares.mulDiv(s_trueAmountOfAssets + 1, totalSupply() + 10 ** _decimalsOffset(), rounding);
     }
 
-    /**
-     * In case the s_totalFees of the engine are insufficient to cover off the remainder of the claim, 
-     * the engine can withdraw assets as well for an emergency basis
-     * 
-     * @param assets The amount of additional assets to be withdrawn by the engine
-     */
-    function emergencyWithdrawal(uint256 assets) external onlyOwner {
-        s_liquidityInteractions.withdrawlLiquidity( address(s_asset), assets);
-        s_asset.transferFrom(address(s_liquidityInteractions) , address(this) , assets);
-        s_trueAmountOfAssets -= assets;
-        s_asset.transfer(address(s_insuranceVaultEngine) , assets);
-    }
+    
 
     //////////////////
     ////Getters//////
@@ -142,6 +167,9 @@ contract InsuranceVault is ERC4626Strategy, Ownable {
         return address(s_insuranceVaultEngine);
     }
 
+    /**
+     * @notice A getter function which returns the amount of assets transferred into the liquidity pool at the moment
+     */
     function getTrueAmountOfAssets() external view returns(uint256) {
         return s_trueAmountOfAssets;
     }
