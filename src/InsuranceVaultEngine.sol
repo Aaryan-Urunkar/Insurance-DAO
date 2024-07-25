@@ -13,6 +13,7 @@ import {console} from "forge-std/console.sol";
  */
 contract InsuranceVaultEngine {
     event DepositSuccess(address sender, uint256 amount, uint256 incrementedMonth);
+    event ClaimWithdrawn(address reciever, uint256 claimAmount);
 
     error InsuranceVaultEngine__PaidLessThanPremiumAndFees();
     error InsuranceVaultEngine__IllegalTransfer();
@@ -30,11 +31,14 @@ contract InsuranceVaultEngine {
     uint256 public constant PERCENTAGE_PRECISION = 100;
     uint256 public constant LIQUIDATION_ELIGIBILITY_TIME_PERIOD = ONE_MONTH * 3;
 
-    InsuranceVault s_vault;
+    InsuranceVault private s_vault;
     IERC20 public immutable s_asset;
     uint256 public s_totalFees; //Variable whicbh represents the exact amount of assets held by this contract
-    mapping(address => uint256) public s_userToMonths;
+    mapping(address => uint256) private s_userToMonths;
     mapping(address => uint256) private s_userToTimestampOfLastPayment;
+    address[] private users;
+    mapping(address => uint256) private s_userToLatitude;
+    mapping(address => uint256) private s_userToLongitude;
 
     /**
      * @dev This constructor sets the vault address and the asset token (ex: wETH, wBTC)
@@ -170,6 +174,14 @@ contract InsuranceVaultEngine {
         return s_userToTimestampOfLastPayment[_user];
     }
 
+    /**
+     * @notice  A function to fetch the no.of months(or premiums paid) a user has existed in the protocol for
+     * @param   _user  The address of the user
+     */
+    function getMembershipMonthsOfUser(address _user) external view returns(uint256) {
+        return s_userToMonths[_user];
+    }
+
     //////////////////////////
     ///Internal functions////
     ////////////////////////
@@ -201,9 +213,11 @@ contract InsuranceVaultEngine {
         s_vault.withdraw(_amount, _to, _to);
         if (_fortyNinePercentOfTreasury >= (_amount * 2)) {
             _withdrawClaimRemainder( _to , _amount);
+            emit ClaimWithdrawn(_to , _amount * 2);
             return _amount * 2;
         } else {
             _withdrawClaimRemainder( _to , _fortyNinePercentOfTreasury - _amount);
+            emit ClaimWithdrawn(_to , _fortyNinePercentOfTreasury - _amount);
             return _amount + (_fortyNinePercentOfTreasury - _amount);
         }
     }
