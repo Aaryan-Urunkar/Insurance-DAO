@@ -1,8 +1,6 @@
 const fs = require("fs");
 const path = require("path");
-const {
-  SecretsManager,
-} = require("@chainlink/functions-toolkit");
+const { SecretsManager } = require("@chainlink/functions-toolkit");
 const ethers = require("ethers");
 require("@chainlink/env-enc").config();
 
@@ -19,7 +17,9 @@ const uploadSecrets = async () => {
   // Initialize ethers signer and provider to interact with the contracts onchain
   const privateKey = process.env.PRIVATE_KEY; // fetch PRIVATE_KEY
   if (!privateKey)
-    throw new Error("Private key not provided - check your environment variables");
+    throw new Error(
+      "Private key not provided - check your environment variables"
+    );
 
   const rpcUrl = process.env.SEPOLIA_RPC_URL; // fetch Sepolia RPC URL
   if (!rpcUrl)
@@ -55,7 +55,11 @@ const uploadSecrets = async () => {
   });
 
   if (!uploadResult.success) {
-    throw new Error(`Encrypted secrets not uploaded. Response: ${JSON.stringify(uploadResult)}`);
+    throw new Error(
+      `Encrypted secrets not uploaded. Response: ${JSON.stringify(
+        uploadResult
+      )}`
+    );
   }
 
   console.log("✅ Secrets uploaded successfully!");
@@ -65,6 +69,7 @@ const uploadSecrets = async () => {
   console.log(`Version: ${uploadResult.version}`);
   console.log(`Success: ${uploadResult.success}`);
   console.log(`Response: ${JSON.stringify(uploadResult)}`);
+  console.log(`To gateways: ${gatewayUrls}`);
 };
 
 uploadSecrets().catch((e) => {
