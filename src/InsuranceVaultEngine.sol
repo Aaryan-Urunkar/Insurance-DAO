@@ -7,9 +7,9 @@ import {console} from "forge-std/console.sol";
 
 /**
  * @author  Aaryan Urunkar
- * @title   InsuranceVaultEngine
+ * @title   InsuranceVaultEngine.sol
  * @dev     Contract written with additional insurance based operations on InsuranceVault
- * @notice  An insurance system which promises
+ * @notice  An insurance system which promises 200% ROI or 49% of treasury to policy holders
  */
 contract InsuranceVaultEngine {
     event DepositSuccess(address sender, uint256 amount, uint256 incrementedMonth);
