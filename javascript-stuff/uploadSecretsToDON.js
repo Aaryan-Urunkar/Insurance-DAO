@@ -2,6 +2,7 @@ const fs = require("fs");
 const path = require("path");
 const { SecretsManager } = require("@chainlink/functions-toolkit");
 const ethers = require("ethers");
+const { log } = require("console");
 require("@chainlink/env-enc").config();
 
 const routerAddress = "0xb83E47C2bC239B3bf370bc41e1459A34b41238D0";
@@ -64,11 +65,17 @@ const uploadSecrets = async () => {
 
   console.log("✅ Secrets uploaded successfully!");
 
+  const uploadSecretsReference = secretsManager.buildDONHostedEncryptedSecretsReference({
+    slotId : slotIdNumber , 
+    version : uploadResult.version
+  });
+
   // Fetch and log details of the uploaded secrets
   console.log(`Uploaded secrets details:`);
   console.log(`Version: ${uploadResult.version}`);
   console.log(`Success: ${uploadResult.success}`);
   console.log(`Response: ${JSON.stringify(uploadResult)}`);
+  console.log(`DON hosted uploaded reference: ${uploadSecretsReference}`);
   console.log(`To gateways: ${gatewayUrls}`);
 };
 

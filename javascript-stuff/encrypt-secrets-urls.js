@@ -5,7 +5,7 @@ const ethers = require("ethers");
 require("@chainlink/env-enc").config();
 
 const secretsUrls = [
-  "https://drive.google.com/file/d/1Kd0NmRGWaPTrW7UvLx7codJML0TTMimS/view?usp=sharing",
+  "https://drive.google.com/file/d/1-8Jih8dnu-cuckP1eWe-6vtwIzG85qb6/view?usp=sharing",
   // Add more URLs if needed
 ];
 

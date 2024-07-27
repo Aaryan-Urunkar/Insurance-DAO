@@ -39,6 +39,7 @@ contract InsuranceVaultEngine {
     address[] private users;
     mapping(address => uint256) private s_userToLatitude;
     mapping(address => uint256) private s_userToLongitude;
+    mapping(address => bool) private s_userToPureMembership;
 
     /**
      * @dev This constructor sets the vault address and the asset token (ex: wETH, wBTC)
@@ -54,7 +55,7 @@ contract InsuranceVaultEngine {
     /**
      * @notice  A function to let new users enter the policy and existing users deposit their monthly premium
      *
-     * @dev This function stores MONTHLY_PREMIUM in vault and the remainder( fees) to this contract
+     * @dev This function stores MONTHLY_PREMIUM in vault and the remainder( fees) within this contract
      */
     function depositToPolicy(uint256 _amount) public {
         if (
@@ -67,8 +68,13 @@ contract InsuranceVaultEngine {
             revert InsuranceVaultEngine__PaidLessThanPremiumAndFees();
         }
         s_totalFees += _amount - MONTHLY_PREMIUM;
-        s_userToMonths[msg.sender] += 1;
+        uint256 userMonths = s_userToMonths[msg.sender] += 1;
         s_userToTimestampOfLastPayment[msg.sender] = block.timestamp;
+        if(userMonths >= 6){
+            users.push(msg.sender);
+            s_userToPureMembership[msg.sender] = true;
+        }
+
 
         bool success = s_asset.transferFrom(msg.sender, address(this), _amount);
         if (!success) {
@@ -88,19 +94,22 @@ contract InsuranceVaultEngine {
      *  2 scenarios: If premium * 2 > 49% of storage and premium * 2 < 49% of storage
      *  For 1st scenario the holder directly avails 49% of the treasury no questions asked
      *  For 2nd scenario the holder directly avails premium * 2
+     * 
+     * @param _to The address of the receiver of the claim
      */
-    function withdrawClaim() external returns (uint256) {
-        if (monthsToDuration(s_userToMonths[msg.sender]) < MINIMUM_MEMBERSHIP_PERIOD_TO_AVAIL_CLAIM) {
+    function _withdrawClaim(address _to) internal returns (uint256) {
+        if (monthsToDuration(s_userToMonths[_to]) < MINIMUM_MEMBERSHIP_PERIOD_TO_AVAIL_CLAIM) {
             revert InsuranceVaultEngine__MinimumPeriodNotLapsed();
         }
 
-        uint256 userPremiumBalance = s_vault.balanceOf(msg.sender);
+        uint256 userPremiumBalance = s_vault.balanceOf(_to);
         uint256 fullTreasury = _calculateTreasury();
         uint256 fortyNinePercentOfTreasury = (fullTreasury * MAX_PERCENTAGE_OF_TREASURY_ALLOTED) / PERCENTAGE_PRECISION;
-        s_userToMonths[msg.sender] = 0;
-        s_userToTimestampOfLastPayment[msg.sender] = 0;
+        s_userToMonths[_to] = 0;
+        s_userToTimestampOfLastPayment[_to] = 0;
+        s_userToPureMembership[_to] = false;
 
-        return _withdrawClaim(fortyNinePercentOfTreasury , userPremiumBalance , msg.sender);
+        return _withdrawClaim(fortyNinePercentOfTreasury , userPremiumBalance , _to);
     }
 
     
@@ -143,6 +152,7 @@ contract InsuranceVaultEngine {
 
         s_userToMonths[_userToLiquidate] = 0;
         s_userToTimestampOfLastPayment[_userToLiquidate] = 0;
+        s_userToPureMembership[_userToLiquidate] = false;
     }
 
 
@@ -180,6 +190,29 @@ contract InsuranceVaultEngine {
      */
     function getMembershipMonthsOfUser(address _user) external view returns(uint256) {
         return s_userToMonths[_user];
+    }
+
+    /**
+     * A function to get all users of the protocol
+     */
+    function getUsers() public view returns(address[] memory){
+        return users;
+    }
+
+    /**
+     * @notice Returns location details of user such as latitude
+     * @param _user The address of the user
+     */
+    function getUserLatitude(address _user) internal view returns(uint256) {
+        return s_userToLatitude[_user];
+    }
+
+    function getUserLongitude(address _user) internal view returns(uint256) {
+        return s_userToLongitude[_user];
+    }
+
+    function getIfUserHasPureMemberShip(address _user) internal view returns(bool) {
+        return s_userToPureMembership[_user];
     }
 
     //////////////////////////
