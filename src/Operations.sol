@@ -1,7 +1,7 @@
 // SPDX-License-Identifier:MIT
 pragma solidity ^0.8.23;
 
-import {InsuranceVaultEngine} from "./InsuranceVaultEngine.sol";
+import {InsuranceVaultEngine} from "./main/InsuranceVaultEngine.sol";
 import {FunctionsClient} from "@chainlink/contracts/v0.8/functions/v1_0_0/FunctionsClient.sol";
 import {ConfirmedOwner} from "@chainlink/contracts/v0.8/shared/access/ConfirmedOwner.sol";
 import {FunctionsRequest} from "@chainlink/contracts/v0.8/functions/v1_0_0/libraries/FunctionsRequest.sol";
@@ -21,11 +21,11 @@ contract Operations is FunctionsClient, InsuranceVaultEngine, AutomationCompatib
     bytes32 public constant DON_ID = 0x66756e2d657468657265756d2d7365706f6c69612d3100000000000000000000; //Hardcoded for sepolia
     uint64 public constant SUB_ID = 3291;
     uint256 public constant ONE_HOUR = 60 * 60;
-    // bytes public constant ENCRYPTED_SECRETS_URL = 0xa266736c6f744964006776657273696f6e1a66a531a2;
 
-    bytes32 public s_lastRequestId;
+    bytes s_encryptedSecretsUrl;
     bytes public s_lastResponse;
     uint256 s_lastAutomationTimestamp;
+    mapping(bytes32 => address) s_requestIDToAddress;
 
     /**
      * @dev This is the API call source code written in javascript
@@ -54,12 +54,13 @@ contract Operations is FunctionsClient, InsuranceVaultEngine, AutomationCompatib
     /**
      * Constructor for the Operations.sol contract
      */
-    constructor(address _vault, address _asset)
+    constructor(address _vault, address _asset, bytes memory _encryptedSecretsUrl)
         FunctionsClient(ROUTER_ADDRESS)
         InsuranceVaultEngine(_vault, _asset)
         ConfirmedOwner(msg.sender)
     {
         s_lastAutomationTimestamp = block.timestamp;
+        s_encryptedSecretsUrl = _encryptedSecretsUrl;
     }
 
     /**
@@ -71,32 +72,47 @@ contract Operations is FunctionsClient, InsuranceVaultEngine, AutomationCompatib
      *          To gateways: https://01.functions-gateway.testnet.chain.link/,https://02.functions-gateway.testnet.chain.link/
      *
      *  @param user The address of the user
-     *  @param donHostedSecretsSlotID The slot ID where the secrets are hosted on the DON
-     *  @param donHostedSecretsVersion The version of the secrets when they are uploaded to the DON
      *  @return  requestId  The request ID designated for the particular API call
      */
-    function sendRequest(address user, uint8 donHostedSecretsSlotID, uint64 donHostedSecretsVersion)
-        internal
-        returns (bytes32)
-    {
+    function sendRequest(
+        address user // uint8 /*donHostedSecretsSlotID*/ uint64 /*donHostedSecretsVersion*/ )
+    ) internal returns (bytes32) {
         FunctionsRequest.Request memory req;
         req.initializeRequestForInlineJavaScript(SOURCE);
-        req.addDONHostedSecrets(donHostedSecretsSlotID, donHostedSecretsVersion);
+        req.addSecretsReference(s_encryptedSecretsUrl);
+        //req.addDONHostedSecrets(donHostedSecretsSlotID, donHostedSecretsVersion);
 
         string[] memory args = new string[](2);
         args[0] = Strings.toString(getUserLatitude(user));
         args[1] = Strings.toString(getUserLongitude(user));
 
-        s_lastRequestId = _sendRequest(req.encodeCBOR(), SUB_ID, GAS_LIMIT, DON_ID);
-        return s_lastRequestId;
+        bytes32 requestId = _sendRequest(req.encodeCBOR(), SUB_ID, GAS_LIMIT, DON_ID);
+        s_requestIDToAddress[requestId] = user;
+        return requestId;
     }
 
     /**
      * @notice  A function to recieve data from API
      * @dev Inherited from FunctionsClient.sol
+     *
+     * Once an API call for a particular request ID is returned, we will check is the corresponding user is eligible for claim or not
      */
-    function fulfillRequest(bytes32 requestId, bytes memory response, bytes memory err) internal virtual override {
+    function fulfillRequest(bytes32 requestId, bytes memory response, bytes memory /*err*/ )
+        internal
+        virtual
+        override
+    {
         //If the uint256(response) is greater than or equal to 4 we have to initiate a withdrawal process to that user
+        address user = s_requestIDToAddress[requestId];
+        string memory points = string(response);
+        if (
+            keccak256(abi.encode(points)) == keccak256(abi.encode("4"))
+                || keccak256(abi.encode(points)) == keccak256(abi.encode("5"))
+                || keccak256(abi.encode(points)) == keccak256(abi.encode("6"))
+                || keccak256(abi.encode(points)) == keccak256(abi.encode("7"))
+        ) {
+            _withdrawClaim(user);
+        }
     }
 
     /**
@@ -104,7 +120,7 @@ contract Operations is FunctionsClient, InsuranceVaultEngine, AutomationCompatib
      * @dev     Inherited from AutomationCompatibleInterface.sol
      * @return  upkeepNeeded  A bool to check if the automated tasks should run or not. If true, they should, else, they shouldnt
      * @return  bytes  .
-     * 
+     *
      * Basically if one hour has passed since the last time this function has run, and if there are users in the protocol, this
      * function will return true
      */
@@ -117,13 +133,20 @@ contract Operations is FunctionsClient, InsuranceVaultEngine, AutomationCompatib
         bool ifUsers = getUsers().length > 0;
         bool ifTimeHasPassed = (s_lastAutomationTimestamp + ONE_HOUR) < block.timestamp;
         upkeepNeeded = ifUsers && ifTimeHasPassed;
-        return (upkeepNeeded , "0x0");
+        return (upkeepNeeded, "0x0");
     }
 
     /**
      * @notice A function which runs every hour and checks if there are any users eligible for claims or not
      * @dev Inherited from AutomationCompatibleInterface.sol
-     * 
+     *
+     * Basically in this function we just have to loop through all users and find out their eligibility for a claim
      */
-    function performUpkeep(bytes calldata /* performData */ ) external override {}
+    function performUpkeep(bytes calldata /* performData */ ) external override {
+        address[] memory users = getUsers();
+        uint256 length = users.length;
+        for (uint256 i = 0; i < length; i++) {
+            sendRequest(users[i]);
+        }
+    }
 }

@@ -13,15 +13,15 @@ pragma solidity ^0.8.19;
 
 import {Test, console} from "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
-import {InsuranceVault} from "../../src/InsuranceVault.sol";
-import {InsuranceVaultEngine} from "../../src/InsuranceVaultEngine.sol";
+import {InsuranceVault} from "../../src/main/InsuranceVault.sol";
+import {InsuranceVaultEngine} from "../../src/main/InsuranceVaultEngine.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ERC20Mock} from "@openzeppelin/contracts/mocks/token/ERC20Mock.sol";
 import {IPoolAddressesProvider} from "@aave/core-v3/contracts/interfaces/IPoolAddressesProvider.sol";
 import {MockPoolInherited} from "@aave/core-v3/contracts/mocks/helpers/MockPool.sol";
 import {MockPoolAddressesProvider} from "../mocks/MockPoolAddressesProvider.sol";
 import {HelperConfig} from "../../script/HelperConfig.s.sol";
-import {LiquidityInteractions} from "../../src/LiquidityInteractions.sol";
+import {LiquidityInteractions} from "../../src/lending-pool-conf/LiquidityInteractions.sol";
 
 contract Name is Test {
     event DepositSuccess(address sender, uint256 amount, uint256 incrementedMonth);
