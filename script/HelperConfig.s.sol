@@ -11,6 +11,7 @@ contract HelperConfig is Script {
 
 
     struct NetworkConfig {
+        address owner;
         address asset;
         address poolAddressesProvider;
     }
@@ -26,6 +27,7 @@ contract HelperConfig is Script {
 
     function getSepoliaETHConfig() public pure returns(NetworkConfig memory){
         return NetworkConfig({
+            owner: 0x653D51D80a904085e3Eb69f462B8139b718ae837,
             asset: 0xFF34B3d4Aee8ddCd6F9AFFFB6Fe49bD371b8a357, //DAI
             poolAddressesProvider: 0x012bAC54348C0E635dCAc9D5FB99f06F24136C9A
         });
@@ -39,6 +41,7 @@ contract HelperConfig is Script {
         vm.stopBroadcast();
 
         return NetworkConfig({
+            owner: 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266,
             asset:address(asset) , 
             poolAddressesProvider : address(mockPool)
         });

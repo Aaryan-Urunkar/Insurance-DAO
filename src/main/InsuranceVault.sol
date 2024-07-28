@@ -6,8 +6,8 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {InsuranceVaultEngine} from "./InsuranceVaultEngine.sol";
-import {ERC4626Strategy} from "./imports/ERC4626Strategy.sol";
-import {LiquidityInteractions} from "./LiquidityInteractions.sol";
+import {ERC4626Strategy} from "../imports/ERC4626Strategy.sol";
+import {LiquidityInteractions} from "../lending-pool-conf/LiquidityInteractions.sol";
 import {Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 
 /**

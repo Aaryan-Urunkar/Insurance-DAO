@@ -13,3 +13,9 @@ docs/
 # Dotenv file
 .env
 node_modules
+.env.enc
+node_modules
+
+#extras
+offchain-secrets.json
+notes.txt

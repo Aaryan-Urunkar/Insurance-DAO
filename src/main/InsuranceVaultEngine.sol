@@ -7,9 +7,9 @@ import {console} from "forge-std/console.sol";
 
 /**
  * @author  Aaryan Urunkar
- * @title   InsuranceVaultEngine
+ * @title   InsuranceVaultEngine.sol
  * @dev     Contract written with additional insurance based operations on InsuranceVault
- * @notice  An insurance system which promises
+ * @notice  An insurance system which promises 200% ROI or 49% of treasury to policy holders
  */
 contract InsuranceVaultEngine {
     event DepositSuccess(address sender, uint256 amount, uint256 incrementedMonth);
@@ -39,9 +39,10 @@ contract InsuranceVaultEngine {
     address[] private users;
     mapping(address => uint256) private s_userToLatitude;
     mapping(address => uint256) private s_userToLongitude;
+    mapping(address => bool) private s_userToPureMembership;
 
     /**
-     * @dev This constructor sets the vault address and the asset token (ex: wETH, wBTC)
+     * @dev This constructor sets the vault address and the asset token (ex: wETH, wBTC, DAI)
      * @param _vault The address of the deployed InsuranceVault contract
      * @param _asset The address of the deployed asset
      */
@@ -54,7 +55,7 @@ contract InsuranceVaultEngine {
     /**
      * @notice  A function to let new users enter the policy and existing users deposit their monthly premium
      *
-     * @dev This function stores MONTHLY_PREMIUM in vault and the remainder( fees) to this contract
+     * @dev This function stores MONTHLY_PREMIUM in vault and the remainder( fees) within this contract
      */
     function depositToPolicy(uint256 _amount) public {
         if (
@@ -67,8 +68,12 @@ contract InsuranceVaultEngine {
             revert InsuranceVaultEngine__PaidLessThanPremiumAndFees();
         }
         s_totalFees += _amount - MONTHLY_PREMIUM;
-        s_userToMonths[msg.sender] += 1;
+        uint256 userMonths = s_userToMonths[msg.sender] += 1;
         s_userToTimestampOfLastPayment[msg.sender] = block.timestamp;
+        if (userMonths >= 6) {
+            users.push(msg.sender);
+            s_userToPureMembership[msg.sender] = true;
+        }
 
         bool success = s_asset.transferFrom(msg.sender, address(this), _amount);
         if (!success) {
@@ -88,22 +93,23 @@ contract InsuranceVaultEngine {
      *  2 scenarios: If premium * 2 > 49% of storage and premium * 2 < 49% of storage
      *  For 1st scenario the holder directly avails 49% of the treasury no questions asked
      *  For 2nd scenario the holder directly avails premium * 2
+     *
+     * @param _to The address of the receiver of the claim
      */
-    function withdrawClaim() external returns (uint256) {
-        if (monthsToDuration(s_userToMonths[msg.sender]) < MINIMUM_MEMBERSHIP_PERIOD_TO_AVAIL_CLAIM) {
+    function _withdrawClaim(address _to) internal returns (uint256) {
+        if (monthsToDuration(s_userToMonths[_to]) < MINIMUM_MEMBERSHIP_PERIOD_TO_AVAIL_CLAIM) {
             revert InsuranceVaultEngine__MinimumPeriodNotLapsed();
         }
 
-        uint256 userPremiumBalance = s_vault.balanceOf(msg.sender);
+        uint256 userPremiumBalance = s_vault.balanceOf(_to);
         uint256 fullTreasury = _calculateTreasury();
         uint256 fortyNinePercentOfTreasury = (fullTreasury * MAX_PERCENTAGE_OF_TREASURY_ALLOTED) / PERCENTAGE_PRECISION;
-        s_userToMonths[msg.sender] = 0;
-        s_userToTimestampOfLastPayment[msg.sender] = 0;
+        s_userToMonths[_to] = 0;
+        s_userToTimestampOfLastPayment[_to] = 0;
+        s_userToPureMembership[_to] = false;
 
-        return _withdrawClaim(fortyNinePercentOfTreasury , userPremiumBalance , msg.sender);
+        return __withdrawClaim(fortyNinePercentOfTreasury, userPremiumBalance, _to);
     }
-
-    
 
     /**
      * @notice Once a policy holder does not pay his monthly premiums and is very incosistent for a period longer
@@ -143,14 +149,14 @@ contract InsuranceVaultEngine {
 
         s_userToMonths[_userToLiquidate] = 0;
         s_userToTimestampOfLastPayment[_userToLiquidate] = 0;
+        s_userToPureMembership[_userToLiquidate] = false;
     }
-
 
     fallback() external {
         revert InsuranceVaultEngine__IllegalTransfer();
     }
 
-    receive() external payable{
+    receive() external payable {
         revert InsuranceVaultEngine__IllegalTransfer();
     }
 
@@ -178,8 +184,39 @@ contract InsuranceVaultEngine {
      * @notice  A function to fetch the no.of months(or premiums paid) a user has existed in the protocol for
      * @param   _user  The address of the user
      */
-    function getMembershipMonthsOfUser(address _user) external view returns(uint256) {
+    function getMembershipMonthsOfUser(address _user) external view returns (uint256) {
         return s_userToMonths[_user];
+    }
+
+    /**
+     * A function to get all users of the protocol
+     */
+    function getUsers() public view returns (address[] memory) {
+        return users;
+    }
+
+    /**
+     * @notice Returns location details of user such as latitude
+     * @param _user The address of the user
+     */
+    function getUserLatitude(address _user) internal view returns (uint256) {
+        return s_userToLatitude[_user];
+    }
+
+    /**
+     * @notice Returns the details of th euser such as longitude
+     * @param _user The address of the user
+     */
+    function getUserLongitude(address _user) internal view returns (uint256) {
+        return s_userToLongitude[_user];
+    }
+
+    /**
+     * @notice Returns if the user has a pure membership(aka Has spent enough time in the protocol to be eligible for a claim)
+     * @param _user The address of the user
+     */
+    function getIfUserHasPureMemberShip(address _user) public view returns (bool) {
+        return s_userToPureMembership[_user];
     }
 
     //////////////////////////
@@ -204,20 +241,23 @@ contract InsuranceVaultEngine {
 
     /**
      * Can transfer claims for eligible members by withdrawing from vault
-     * 
+     *
      * @param _fortyNinePercentOfTreasury Forty nine percent of the treasury
      * @param _amount The aggregate premiums of the user in the protocol
      * @param _to The address of the reciever of the claim
      */
-    function _withdrawClaim(uint256 _fortyNinePercentOfTreasury, uint256 _amount, address _to) internal returns(uint256){
+    function __withdrawClaim(uint256 _fortyNinePercentOfTreasury, uint256 _amount, address _to)
+        internal
+        returns (uint256)
+    {
         s_vault.withdraw(_amount, _to, _to);
         if (_fortyNinePercentOfTreasury >= (_amount * 2)) {
-            _withdrawClaimRemainder( _to , _amount);
-            emit ClaimWithdrawn(_to , _amount * 2);
+            _withdrawClaimRemainder(_to, _amount);
+            emit ClaimWithdrawn(_to, _amount * 2);
             return _amount * 2;
         } else {
-            _withdrawClaimRemainder( _to , _fortyNinePercentOfTreasury - _amount);
-            emit ClaimWithdrawn(_to , _fortyNinePercentOfTreasury - _amount);
+            _withdrawClaimRemainder(_to, _fortyNinePercentOfTreasury - _amount);
+            emit ClaimWithdrawn(_to, _fortyNinePercentOfTreasury - _amount);
             return _amount + (_fortyNinePercentOfTreasury - _amount);
         }
     }
@@ -227,12 +267,11 @@ contract InsuranceVaultEngine {
      * @param   _to  The address of the reciever of the assets
      * @param   _remainder  The remainder amount of the assets after first transfer
      */
-    function _withdrawClaimRemainder(address _to , uint256 _remainder) internal {
+    function _withdrawClaimRemainder(address _to, uint256 _remainder) internal {
         if (s_totalFees < _remainder) {
             _flashWithdrawFromVault(_remainder - s_totalFees);
         }
         s_asset.transfer(_to, _remainder);
         s_totalFees -= _remainder;
     }
-
 }
