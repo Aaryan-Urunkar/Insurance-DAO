@@ -21,6 +21,10 @@ contract InsuranceVaultEngine {
     error InsuranceVaultEngine__MinimumPeriodNotLapsed();
     error InsuranceVaultEngine__PaidLessThanMinimumLiquidationFeeToLiquidate();
     error InsuranceVaultEngine__UserCannotBeLiquidatedYet();
+    error InsuranceVaultEngine__UserIsANewUserAndTryingToUseRegisteredUserDepositFunction();
+    error InsuranceVaultEngine__AlreadyARegisteredUser();
+    error InsuranceVaultEngine__NotAPolicyHolder();
+    error InsuranceVaultEngine__PaidLessThanMinimumFeeToChangeLocation();
 
     uint256 public constant MONTHLY_PREMIUM = 150 ether; //Assuming we are working with DAI
     uint256 public constant MONTHLY_FEE = 30 ether;
@@ -30,6 +34,7 @@ contract InsuranceVaultEngine {
     uint256 public constant MAX_PERCENTAGE_OF_TREASURY_ALLOTED = 49;
     uint256 public constant PERCENTAGE_PRECISION = 100;
     uint256 public constant LIQUIDATION_ELIGIBILITY_TIME_PERIOD = ONE_MONTH * 3;
+    uint256 public constant LOCATION_CHANGING_FEES = 60 ether;
 
     InsuranceVault private s_vault;
     IERC20 public immutable s_asset;
@@ -57,33 +62,70 @@ contract InsuranceVaultEngine {
      *
      * @dev This function stores MONTHLY_PREMIUM in vault and the remainder( fees) within this contract
      */
-    function depositToPolicy(uint256 _amount) public {
+    function depositToPolicy(uint256 _amount , address _from) public {
+        if (_amount < MONTHLY_PREMIUM + MONTHLY_FEE) {
+            revert InsuranceVaultEngine__PaidLessThanPremiumAndFees();
+        }
+        if(s_userToLatitude[_from] == 0 && s_userToLongitude[_from] == 0 && s_userToMonths[_from] == 0){
+            revert InsuranceVaultEngine__UserIsANewUserAndTryingToUseRegisteredUserDepositFunction();
+        }
         if (
-            s_userToMonths[msg.sender] != 0
+            s_userToMonths[_from] != 0
                 && (s_userToTimestampOfLastPayment[msg.sender] + ONE_MONTH > block.timestamp)
         ) {
             revert InsuranceVaultEngine__MinimumPeriodNotLapsed();
         }
-        if (_amount < MONTHLY_PREMIUM + MONTHLY_FEE) {
-            revert InsuranceVaultEngine__PaidLessThanPremiumAndFees();
-        }
         s_totalFees += _amount - MONTHLY_PREMIUM;
-        uint256 userMonths = s_userToMonths[msg.sender] += 1;
-        s_userToTimestampOfLastPayment[msg.sender] = block.timestamp;
+        uint256 userMonths = s_userToMonths[_from] += 1;
+        s_userToTimestampOfLastPayment[_from] = block.timestamp;
         if (userMonths >= 6) {
-            users.push(msg.sender);
-            s_userToPureMembership[msg.sender] = true;
+            users.push(_from);
+            s_userToPureMembership[_from] = true;
         }
 
-        bool success = s_asset.transferFrom(msg.sender, address(this), _amount);
+        bool success = s_asset.transferFrom(_from, address(this), _amount);
         if (!success) {
             revert InsuranceVaultEngine__TransferToVaultFailed();
         }
 
         s_asset.approve(address(s_vault), MONTHLY_PREMIUM);
-        s_vault.deposit(MONTHLY_PREMIUM, msg.sender);
+        s_vault.deposit(MONTHLY_PREMIUM, _from);
 
-        emit DepositSuccess(msg.sender, _amount, s_userToMonths[msg.sender]);
+        emit DepositSuccess(_from, _amount, s_userToMonths[_from]);
+    }
+
+    /**
+     * @notice  A function for new members to enter the policy by giving in their residential details such as latitude and longitude
+     * @param   _sixDigitsLatitude  The latitutde of the new user
+     * @param   _sixDigitsLongitude  The longitude of the new user
+     * @param   _amount  The first deposit amount of the new user
+     * @param   _from  The address of the user or whichever address that holds enough amount of the asset
+     */
+    function newMemberDepositToPolicy(uint256 _sixDigitsLatitude , uint256 _sixDigitsLongitude , uint256 _amount , address _from) external {
+        if(s_userToMonths[_from] != 0){
+            revert InsuranceVaultEngine__AlreadyARegisteredUser();
+        }
+        s_userToLatitude[_from] = _sixDigitsLatitude;
+        s_userToLongitude[_from] = _sixDigitsLongitude;
+        depositToPolicy(_amount , _from);
+    }
+
+    /**
+     * @notice  Users can change their residential details if they wish so
+     * @param   _poolicyHolderAddress  Address of the policy holder
+     * @param   _newSixDigitLatitude  New latitude
+     * @param   _newSixDigitLongitude  New longitude
+     * @param _fee The fee to change user location
+     */
+    function changeResidentialDetails(address _poolicyHolderAddress , uint256 _newSixDigitLatitude , uint256 _newSixDigitLongitude , uint256 _fee) external {
+        if(s_userToMonths[_poolicyHolderAddress] == 0){
+            revert InsuranceVaultEngine__NotAPolicyHolder();
+        }
+        if(_fee < LOCATION_CHANGING_FEES){
+            revert InsuranceVaultEngine__PaidLessThanMinimumFeeToChangeLocation();
+        }
+        s_userToLatitude[_poolicyHolderAddress] = _newSixDigitLatitude;
+        s_userToLongitude[_poolicyHolderAddress] = _newSixDigitLongitude;
     }
 
     /**
@@ -96,7 +138,7 @@ contract InsuranceVaultEngine {
      *
      * @param _to The address of the receiver of the claim
      */
-    function _withdrawClaim(address _to) internal returns (uint256) {
+    function _withdrawClaim(address _to) public returns (uint256) {
         if (monthsToDuration(s_userToMonths[_to]) < MINIMUM_MEMBERSHIP_PERIOD_TO_AVAIL_CLAIM) {
             revert InsuranceVaultEngine__MinimumPeriodNotLapsed();
         }

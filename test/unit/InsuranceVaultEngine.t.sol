@@ -69,7 +69,7 @@ contract Name is Test {
         uint256 amt = 120 ether;
         token.approve(address(engine), amt);
         vm.expectRevert(InsuranceVaultEngine.InsuranceVaultEngine__PaidLessThanPremiumAndFees.selector);
-        engine.depositToPolicy(amt);
+        engine.newMemberDepositToPolicy(100000 , 100000 , amt , USER);
         vm.stopPrank();
     }
 
@@ -77,7 +77,7 @@ contract Name is Test {
         vm.startPrank(USER);
         uint256 amt = 210 ether;
         token.approve(address(engine), amt);
-        engine.depositToPolicy(amt);
+        engine.newMemberDepositToPolicy(100000 , 100000, amt , USER);
         vm.stopPrank();
         _;
     }
@@ -92,7 +92,7 @@ contract Name is Test {
         token.approve(address(engine), amt);
         vm.expectEmit(true, true, true, false, address(engine));
         emit DepositSuccess(USER, amt, 1);
-        engine.depositToPolicy(amt);
+        engine.newMemberDepositToPolicy(100000 , 100000, amt , USER);
         vm.stopPrank();
     }
 
@@ -115,16 +115,21 @@ contract Name is Test {
         vm.startPrank(USER);
         uint256 amt = 210 ether;
         token.approve(address(engine), amt);
-        engine.depositToPolicy(amt);
+        engine.newMemberDepositToPolicy( 100000 , 100000 , amt , USER);
         vm.stopPrank();
         newUser1 = makeAddr("newuser");
         newUser2 = makeAddr("alsonewuser");
         ERC20Mock tokenToMint = ERC20Mock(address(token));
         vm.prank(DAI_TOKEN_OWNER);
         tokenToMint.mint(newUser1, 300000 ether);
+        vm.prank(newUser1);
+        token.approve(address(engine), type(uint256).max);
         vm.prank(DAI_TOKEN_OWNER);
         tokenToMint.mint(newUser2, 300000 ether);
-
+        vm.prank(newUser2);
+        token.approve(address(engine), type(uint256).max);
+        engine.newMemberDepositToPolicy(100000 , 100000 , 180 ether , newUser1);
+        engine.newMemberDepositToPolicy(100000 , 100000 , 180 ether, newUser2);
         vm.prank(USER);
         token.approve(address(engine), type(uint256).max - 1);
 
@@ -133,17 +138,17 @@ contract Name is Test {
             vm.warp(block.timestamp + ONE_MONTH + i);
 
             vm.startPrank(USER);
-            engine.depositToPolicy(210 ether);
+            engine.depositToPolicy(210 ether , USER);
             vm.stopPrank();
 
             vm.startPrank(newUser1);
             token.approve(address(engine), type(uint256).max);
-            engine.depositToPolicy(180 ether);
+            engine.depositToPolicy(180 ether , newUser1);
             vm.stopPrank();
 
             vm.startPrank(newUser2);
             token.approve(address(engine), type(uint256).max);
-            engine.depositToPolicy(180 ether);
+            engine.depositToPolicy(180 ether , newUser2);
             vm.stopPrank();
         }
         _;
@@ -174,7 +179,10 @@ contract Name is Test {
         vm.startPrank(tempUser);
         uint256 amt = 210 ether;
         token.approve(address(engine), type(uint256).max);
-        engine.depositToPolicy(amt);
+        engine.newMemberDepositToPolicy(100000 , 100000 ,amt , tempUser);
+        vm.warp(block.timestamp + ONE_MONTH + 1);
+        vm.roll(block.number + 1);
+        engine.depositToPolicy( amt , tempUser);
         vm.stopPrank();
 
         uint256 expectedClaim = MONTHLY_PREMIUM * engine.getMembershipMonthsOfUser(newUser1) * 2;

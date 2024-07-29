@@ -31,7 +31,7 @@ contract Operations is FunctionsClient, InsuranceVaultEngine, AutomationCompatib
      * @dev This is the API call source code written in javascript
      *
      */
-    string constant SOURCE = "const latitude = args[0];" "const longitude = args[1];"
+    string constant SOURCE = "const latitude = args[0]/10000;" "const longitude = args[1]/10000;"
         "const apiKey = secrets.apiKey; // Your OpenWeather API key" "if (!apiKey) {"
         "throw Error(`OPENWEATHER_ API_KEY environment variable not set for OpenWeather API. Get a free key from https://openweathermap.org/api`);"
         "}" "// build HTTP request object" "const openWeatherRequest = Functions.makeHttpRequest({"
