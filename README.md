@@ -116,79 +116,80 @@ To deploy your own Operations.sol contracts, you need 2 prerequisites:
 
 
 1. **Create a .env.enc with encrypted environment variables**
-<br>
 
-    To store your encrypted environment variables, follow the following steps:
 
-    Set a password. This is a mandatory step everytime you kill a terminal and open a new one. Your password let's you access your environment variables and modify them. While the enviroment variables are stored permananently in the .env.enc file in an encrypted form, your password needs to be set anew everytime a new terminal is opened.
+To store your encrypted environment variables, follow the following steps:
 
-    ```bash
-    npx env-enc set-pw
-    ```
+Set a password. This is a mandatory step everytime you kill a terminal and open a new one. Your password let's you access your environment variables and modify them. While the enviroment variables are stored permananently in the .env.enc file in an encrypted form, your password needs to be set anew everytime a new terminal is opened.
 
-    Once you set a password, put in the environment variables:
-    ```bash
-    npx env-enc set
-    ```
+```bash
+npx env-enc set-pw
+```
 
-    Now to view them anytime in an unencrypted form you can try using this command:
-    ```bash
-    npx env-enc view
-    ```
+Once you set a password, put in the environment variables:
+```bash
+npx env-enc set
+```
 
-    You must have 3 mandatory environment variables:
-    `SEPOLIA_RPC_URL` , `PRIVATE_KEY` and `OPENWEATHER_API_KEY`
+Now to view them anytime in an unencrypted form you can try using this command:
+```bash
+npx env-enc view
+```
+
+You must have 3 mandatory environment variables:
+`SEPOLIA_RPC_URL` , `PRIVATE_KEY` and `OPENWEATHER_API_KEY`
 
 <br>
 <br>
 
 
 2. **Generate a file containing your encrypted API key and host it online**
-<br>
 
-    This protocol requires using Chainlink functions to call external APIs. However, you always want to prevent storing your API key on chain at all costs and risk exposing it to others. Hence, to do that, what you can do it host your OpenWeather API key online in an encrypted form and encrypt the URL as well into bytes which the Chainlink DON nodes only can use to do the needed api calls.
 
-    To generate a file with your encrypted secrets/api keys, run the following commands. However, I suggest you first make sure you are in the root directory of the project and have all the required environment variables in place in your .env.enc.
+This protocol requires using Chainlink functions to call external APIs. However, you always want to prevent storing your API key on chain at all costs and risk exposing it to others. Hence, to do that, what you can do it host your OpenWeather API key online in an encrypted form and encrypt the URL as well into bytes which the Chainlink DON nodes only can use to do the needed api calls.
 
-    ```bash
-    node javascript-stuff/gen-offchain-secrets.js
-    ```
+To generate a file with your encrypted secrets/api keys, run the following commands. However, I suggest you first make sure you are in the root directory of the project and have all the required environment variables in place in your .env.enc.
 
-    This creates a offchain-secrets.json file in your root directory. It contains your OpenWeather API key in an encrypted form. Upload the file to your Google Drive or AWS (if you have one). For Google Drive, set the access of the file to "Anyone can view with link" and set the permission to viewer. Lastly, copy the link of the file. 
-    
-    Since you have to encrypt the URL into bytes, open the `encrypt-secrets-urls.js` file and paste your drive URL in the secrets URLs by replacing the existing one. Once you have done that, run this script using the following command.
+```bash
+node javascript-stuff/gen-offchain-secrets.js
+```
 
-    ```bash
-    node javascript-stuff/encrypt-secrets-urls.js
-    ```
+This creates a offchain-secrets.json file in your root directory. It contains your OpenWeather API key in an encrypted form. Upload the file to your Google Drive or AWS (if you have one). For Google Drive, set the access of the file to "Anyone can view with link" and set the permission to viewer. Lastly, copy the link of the file. 
 
-    This returns a huge collection of bytes which is the encrypted URL containing your encrypted secrets which will be used by Chainlink Functions to make API calls off-chain.
+Since you have to encrypt the URL into bytes, open the `encrypt-secrets-urls.js` file and paste your drive URL in the secrets URLs by replacing the existing one. Once you have done that, run this script using the following command.
+
+```bash
+node javascript-stuff/encrypt-secrets-urls.js
+```
+
+This returns a huge collection of bytes which is the encrypted URL containing your encrypted secrets which will be used by Chainlink Functions to make API calls off-chain.
 
 <br>
 <br>
 
 3. **Deploy contracts**
-<br>
 
-    Now we move on to deploying the contracts. For the purposes of this project, I have configured the deployment to succeed only for the ETHEREUM SEPOLIA( chain ID: 11155111 ) network. Before commencing the deployments, I suggest you go to <Chainlink href="https://functions.chain.link/">Chainlink Functions</a> and create a subscription.
 
-    Good. Now to deploy all the contracts to Sepolia just follow the below scripts in order:
 
-    ```bash
-    source .env
-    forge script script/DeployInsuranceVault.s.sol --rpc-url $SEPOLIA_RPC_URL --broadcast --private-key $PRIVATE_KEY --verify --etherscan-api-key $ETHERSCAN_API_KEY  
-    ```
+Now we move on to deploying the contracts. For the purposes of this project, I have configured the deployment to succeed only for the ETHEREUM SEPOLIA( chain ID: 11155111 ) network. Before commencing the deployments, I suggest you go to <Chainlink href="https://functions.chain.link/">Chainlink Functions</a> and create a subscription.
 
-    To deploy Operations.sol:
-    ```bash
-    source .env
-    forge script script/DeployOperations.s.sol --rpc-url $SEPOLIA_RPC_URL --broadcast --private-key $PRIVATE_KEY --verify --etherscan-api-key $ETHERSCAN_API_KEY --sig "run(bytes)" {YOUR BYTES ENCRYPTED SECRETS URL}
-    ```
+Good. Now to deploy all the contracts to Sepolia just follow the below scripts in order:
 
-    Open the deployed InsuranceVault.sol contract on etherscan and under the `Write Contract` section open the setVaultAndPoolProvider() function. The first address must be the address of the deployed Operations.sol contract and the second address is the address of the AAVE PoolAddressesProvider contract which can be fetched from here.
+```bash
+source .env
+forge script script/DeployInsuranceVault.s.sol --rpc-url $SEPOLIA_RPC_URL --broadcast --private-key $PRIVATE_KEY --verify --etherscan-api-key $ETHERSCAN_API_KEY  
+```
 
-    Just for your reference, the contract of the AAVE PoolAddressesProvider of the Sepolia testnet for your reference is: `0x012bAC54348C0E635dCAc9D5FB99f06F24136C9A`
+To deploy Operations.sol:
+```bash
+source .env
+forge script script/DeployOperations.s.sol --rpc-url $SEPOLIA_RPC_URL --broadcast --private-key $PRIVATE_KEY --verify --etherscan-api-key $ETHERSCAN_API_KEY --sig "run(bytes)" {YOUR BYTES ENCRYPTED SECRETS URL}
+```
 
-    Copy and paste this address into the poolAddressesProvider argument. 
+Open the deployed InsuranceVault.sol contract on etherscan and under the `Write Contract` section open the setVaultAndPoolProvider() function. The first address must be the address of the deployed Operations.sol contract and the second address is the address of the AAVE PoolAddressesProvider contract which can be fetched from here.
 
-    Wonderful! Now you have successfully and fully set up your own Weather Insurance system on the sepolia network!
+Just for your reference, the contract of the AAVE PoolAddressesProvider of the Sepolia testnet for your reference is: `0x012bAC54348C0E635dCAc9D5FB99f06F24136C9A`
+
+Copy and paste this address into the poolAddressesProvider argument. 
+
+Wonderful! Now you have successfully and fully set up your own Weather Insurance system on the sepolia network!
