@@ -1,7 +1,7 @@
 // SPDX-License-Identifier:MIT
 pragma solidity ^0.8.20;
 import {Script} from "forge-std/Script.sol";
-import {Operations} from "../src/Operations.sol";
+import {Operations} from "../src/operations/Operations.sol";
 import {InsuranceVault} from "../src/main/InsuranceVault.sol";
 import {DevOpsTools} from "lib/foundry-devops/src/DevOpsTools.sol";
 import {HelperConfig} from "./HelperConfig.s.sol";
