@@ -42,7 +42,7 @@ contract Name is Test {
 
     function setUp() external {
         HelperConfig helperConfig = new HelperConfig();
-        (address newToken, address poolAddressesProvider) = helperConfig.activeConfig();
+        ( , address newToken, address poolAddressesProvider) = helperConfig.activeConfig();
         token = IERC20(address(newToken));
         ERC20Mock newTokenMock = ERC20Mock(newToken);
         vault = new InsuranceVault(address(token));
@@ -65,10 +65,12 @@ contract Name is Test {
     ///////////////////
 
     function testIfPayingLesserReverts() external {
-        vm.expectRevert(InsuranceVaultEngine.InsuranceVaultEngine__PaidLessThanPremiumAndFees.selector);
-        vm.prank(USER);
+        vm.startPrank(USER);
         uint256 amt = 120 ether;
+        token.approve(address(engine), amt);
+        vm.expectRevert(InsuranceVaultEngine.InsuranceVaultEngine__PaidLessThanPremiumAndFees.selector);
         engine.depositToPolicy(amt);
+        vm.stopPrank();
     }
 
     modifier depositedToPolicy() {

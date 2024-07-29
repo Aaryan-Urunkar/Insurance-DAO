@@ -52,6 +52,7 @@ List the tools and versions required to work on the project. For example:
 
 - [Foundry](https://getfoundry.sh/) - A blazing fast, portable, and modular toolkit for Ethereum application development written in Rust.
 - [WSL](https://learn.microsoft.com/en-us/windows/wsl/install) - A linux-like terminal in windows systems. Necessary if you want to run foundry.
+- [Metamask](https://metamask.io/download/) - A browser-extension which acts as a wallet for the ethereum blockchain, and other test networks
 
 ### Installation
 
@@ -63,14 +64,18 @@ Step-by-step instructions to set up the project locally.
    foundryup
     ```
 
-2. **Fork the repository**
-
+2. **Clone the repository**
+    ```sh
+    git clone https://github.com/Aaryan-Urunkar/Insurance-DAO.git
+    cd Insurance-DAO
+    ```
 <br>
 <br>
 
 3. **Install dependencies**
     ```sh
     forge install
+    npm install
     ```
 
 4. **Compile all contracts**
@@ -81,6 +86,8 @@ Step-by-step instructions to set up the project locally.
 
 ### Usage
 
+## Tests
+
 To run the tests on a forked environment, create a ``` .env ``` file with the following:
 
 - ```SEPOLIA_RPC_URL``` : You can easily get this from <a href="https://www.alchemy.com/">Alchemy</a>
@@ -90,3 +97,99 @@ To run the tests on a forked environment, create a ``` .env ``` file with the fo
     forge test --fork-url $SEPOLIA_RPC_URL 
     ```
 
+## Use the dApp(pre deployed)
+
+The dApp was made with DAI being the token to be used in mind. If you do not have DAI, I would suggest that you go to a <a href="https://staging.aave.com/faucet/">faucet</a> and mint some DAI for yourself
+
+Good. Once you have minted some DAI for yourself, and are interested in joining the Insurance Protocol by depositing your first premium, open this <a href="https://sepolia.etherscan.io/token/0xFF34B3d4Aee8ddCd6F9AFFFB6Fe49bD371b8a357">link</a> which takes you to the DAI token. Under the ``Contract`` section, go to `Write Contract` and click on approve. There you see a red circle and a prompt asking you to connect your web3 wallet. Go ahead and connect that. Now, in `Write Contract` you should find an `approve` function. For the parameters put the deployed address of the Operations.sol from notes.txt file in this repo and set the approved amount to 190000000000000000000 (190 DAI basically). 
+
+Great! Once you have approved the Operations.sol to hold some DAI, you can now transfer your first premium. Click on this <a href="https://sepolia.etherscan.io/address/0xA6C979E690d4a4D962f06c0344424641121A7458#writeContract">link, </a> go to `Write Contract` section, find the depositToPolicy function, and under the parameters pass the same amount from above which you had approved earlier. 190000000000000000000. Wait fot the transaction to go through and confirm itself. And Voila! You have deposited your first premium in the Weather Insurance DAO.
+
+## Use the dApp(create your own instance)
+
+To deploy your own Operations.sol contracts, you need 2 prerequisites:
+- Chainlink Functions subscription
+- OpenWeather API key
+
+<br>
+<br>
+
+
+1. **Create a .env.enc with encrypted environment variables**
+<br>
+
+    To store your encrypted environment variables, follow the following steps:
+
+    Set a password. This is a mandatory step everytime you kill a terminal and open a new one. Your password let's you access your environment variables and modify them. While the enviroment variables are stored permananently in the .env.enc file in an encrypted form, your password needs to be set anew everytime a new terminal is opened.
+
+    ```bash
+    npx env-enc set-pw
+    ```
+
+    Once you set a password, put in the environment variables:
+    ```bash
+    npx env-enc set
+    ```
+
+    Now to view them anytime in an unencrypted form you can try using this command:
+    ```bash
+    npx env-enc view
+    ```
+
+    You must have 3 mandatory environment variables:
+    `SEPOLIA_RPC_URL` , `PRIVATE_KEY` and `OPENWEATHER_API_KEY`
+
+<br>
+<br>
+
+
+2. **Generate a file containing your encrypted API key and host it online**
+<br>
+
+    This protocol requires using Chainlink functions to call external APIs. However, you always want to prevent storing your API key on chain at all costs and risk exposing it to others. Hence, to do that, what you can do it host your OpenWeather API key online in an encrypted form and encrypt the URL as well into bytes which the Chainlink DON nodes only can use to do the needed api calls.
+
+    To generate a file with your encrypted secrets/api keys, run the following commands. However, I suggest you first make sure you are in the root directory of the project and have all the required environment variables in place in your .env.enc.
+
+    ```bash
+    node javascript-stuff/gen-offchain-secrets.js
+    ```
+
+    This creates a offchain-secrets.json file in your root directory. It contains your OpenWeather API key in an encrypted form. Upload the file to your Google Drive or AWS (if you have one). For Google Drive, set the access of the file to "Anyone can view with link" and set the permission to viewer. Lastly, copy the link of the file. 
+    
+    Since you have to encrypt the URL into bytes, open the `encrypt-secrets-urls.js` file and paste your drive URL in the secrets URLs by replacing the existing one. Once you have done that, run this script using the following command.
+
+    ```bash
+    node javascript-stuff/encrypt-secrets-urls.js
+    ```
+
+    This returns a huge collection of bytes which is the encrypted URL containing your encrypted secrets which will be used by Chainlink Functions to make API calls off-chain.
+
+<br>
+<br>
+
+3. **Deploy contracts**
+<br>
+
+    Now we move on to deploying the contracts. For the purposes of this project, I have configured the deployment to succeed only for the ETHEREUM SEPOLIA( chain ID: 11155111 ) network. Before commencing the deployments, I suggest you go to <Chainlink href="https://functions.chain.link/">Chainlink Functions</a> and create a subscription.
+
+    Good. Now to deploy all the contracts to Sepolia just follow the below scripts in order:
+
+    ```bash
+    source .env
+    forge script script/DeployInsuranceVault.s.sol --rpc-url $SEPOLIA_RPC_URL --broadcast --private-key $PRIVATE_KEY --verify --etherscan-api-key $ETHERSCAN_API_KEY  
+    ```
+
+    To deploy Operations.sol:
+    ```bash
+    source .env
+    forge script script/DeployOperations.s.sol --rpc-url $SEPOLIA_RPC_URL --broadcast --private-key $PRIVATE_KEY --verify --etherscan-api-key $ETHERSCAN_API_KEY --sig "run(bytes)" {YOUR BYTES ENCRYPTED SECRETS URL}
+    ```
+
+    Open the deployed InsuranceVault.sol contract on etherscan and under the `Write Contract` section open the setVaultAndPoolProvider() function. The first address must be the address of the deployed Operations.sol contract and the second address is the address of the AAVE PoolAddressesProvider contract which can be fetched from here.
+
+    Just for your reference, the contract of the AAVE PoolAddressesProvider of the Sepolia testnet for your reference is: `0x012bAC54348C0E635dCAc9D5FB99f06F24136C9A`
+
+    Copy and paste this address into the poolAddressesProvider argument. 
+
+    Wonderful! Now you have successfully and fully set up your own Weather Insurance system on the sepolia network!
+    
