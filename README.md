@@ -84,9 +84,9 @@ Step-by-step instructions to set up the project locally.
     ```
 
 
-### Usage
+## Usage
 
-## Tests
+### Tests
 
 To run the tests on a forked environment, create a ``` .env ``` file with the following:
 
@@ -97,7 +97,7 @@ To run the tests on a forked environment, create a ``` .env ``` file with the fo
     forge test --fork-url $SEPOLIA_RPC_URL 
     ```
 
-## Use the dApp(pre deployed)
+### Use the dApp(pre deployed)
 
 The dApp was made with DAI being the token to be used in mind. If you do not have DAI, I would suggest that you go to a <a href="https://staging.aave.com/faucet/">faucet</a> and mint some DAI for yourself
 
@@ -105,7 +105,7 @@ Good. Once you have minted some DAI for yourself, and are interested in joining 
 
 Great! Once you have approved the Operations.sol to hold some DAI, you can now transfer your first premium. Click on this <a href="https://sepolia.etherscan.io/address/0xA6C979E690d4a4D962f06c0344424641121A7458#writeContract">link, </a> go to `Write Contract` section, find the depositToPolicy function, and under the parameters pass the same amount from above which you had approved earlier. 190000000000000000000. Wait fot the transaction to go through and confirm itself. And Voila! You have deposited your first premium in the Weather Insurance DAO.
 
-## Use the dApp(create your own instance)
+### Use the dApp(create your own instance)
 
 To deploy your own Operations.sol contracts, you need 2 prerequisites:
 - Chainlink Functions subscription
@@ -192,4 +192,3 @@ To deploy your own Operations.sol contracts, you need 2 prerequisites:
     Copy and paste this address into the poolAddressesProvider argument. 
 
     Wonderful! Now you have successfully and fully set up your own Weather Insurance system on the sepolia network!
-    
